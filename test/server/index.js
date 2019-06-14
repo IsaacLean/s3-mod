@@ -2,11 +2,16 @@ const aws = require('aws-sdk')
 const express = require('express')
 const morgan = require('morgan')
 
-const { createLocalUploadMiddleware, setupS3Middleware, createS3SignedRequestMiddleware } = require('../../dist')
+const {
+  default: ffuh,
+  createLocalUploadMiddleware,
+  setupS3Middleware,
+  createS3SignedRequestMiddleware
+} = require('../../dist')
 
 const app = express()
 const port = 4000
-const localFileLocation = 'http://localhost:4000/uploads'
+const localFileLocation = 'http://localhost:3000/uploads'
 const rootPath = '/api'
 
 aws.config.region = process.env.S3_BUCKET_REGION || 'us-west-1'
@@ -17,20 +22,36 @@ app.use(setupS3Middleware(app))
 
 app.get(rootPath, (req, res) => res.send('Hello World!'))
 
+// Local Upload Middleware
+app.put(
+  `${rootPath}/upload-local`,
+  createLocalUploadMiddleware({
+    genRandKeys: true,
+    localPath: `${process.cwd()}/uploads`
+  }),
+  (req, res) => {
+    res.write(`${localFileLocation}/${res.locals.fileName}`)
+    res.end()
+  }
+)
+
+// S3 Signed Request Middleware
 app.get(`${rootPath}/sign-s3`, createS3SignedRequestMiddleware(app, { genRandKeys: true }), (req, res) => {
   res.write(JSON.stringify(res.locals.uploadData))
   res.end()
 })
 
-app.put(
-  `${rootPath}/upload-local`,
-  createLocalUploadMiddleware({
+// FFUH Middleware
+app.get(
+  `${rootPath}/upload-ffuh`,
+  ffuh(app, {
     genRandKeys: true,
     localFileLocation,
+    localUploadEndpoint: 'http://localhost:3000/api/upload-local',
     localPath: `${process.cwd()}/uploads`
   }),
   (req, res) => {
-    res.write(`${localFileLocation}/${res.locals.fileName}`)
+    res.write(JSON.stringify(res.locals.uploadData))
     res.end()
   }
 )

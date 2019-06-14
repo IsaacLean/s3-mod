@@ -39,7 +39,10 @@ const createLocalUploadMiddleware = (options: FFUHOptions = {}): ((req, res, nex
         return next(new Error('Local path does not exist'))
       }
 
-      res.locals.fileName = genRandKeys ? genRandomFileName(f.name) : f.name
+      if (!res.locals.fileName) {
+        res.locals.fileName = genRandKeys ? genRandomFileName(f.name) : f.name
+      }
+
       f.path = path.join(p, res.locals.fileName)
     }
   )
@@ -54,16 +57,6 @@ const createLocalUploadMiddleware = (options: FFUHOptions = {}): ((req, res, nex
       }
 
       res.locals.files = files
-
-      if (res.locals.uploadData) {
-        const { localFileLocation } = options
-
-        if (!localFileLocation) {
-          return next(new Error('No local file location set'))
-        }
-
-        res.locals.uploadData.file = `${localFileLocation}/${res.locals.fileName}`
-      }
 
       return next()
     }
@@ -83,6 +76,8 @@ const setupS3Middleware = (app: Application, s3Options?: S3.ClientConfiguration)
 ): void => {
   if (process.env.S3_BUCKET) {
     createBucket(s3Options, app)
+  } else {
+    console.warn('S3_BUCKET is not set') // eslint-disable-line no-console
   }
 
   next()
@@ -103,6 +98,10 @@ const createS3SignedRequestMiddleware = (app: Application, options: FFUHOptions)
   const { S3_BUCKET } = process.env
 
   if (S3_BUCKET) {
+    if (!app.locals.bucket) {
+      return next(new Error('S3 bucket is not setup'))
+    }
+
     const { name, type } = req.query
     const { expiration, genRandKeys, s3Path } = options
 
@@ -121,9 +120,9 @@ const createS3SignedRequestMiddleware = (app: Application, options: FFUHOptions)
         }
       )
       .catch((err): Promise<any> => next(err)) // eslint-disable-line @typescript-eslint/no-explicit-any
-  } else {
-    throw new Error('S3_BUCKET is not set')
   }
+
+  return next(new Error('S3_BUCKET is not set'))
 }
 
 /**
@@ -149,11 +148,23 @@ export default (
   if (check()) {
     createS3SignedRequestMiddleware(app, options)(req, res, next)
   } else {
-    const { localUploadEndpoint } = options
+    const { name } = req.query
+    const { genRandKeys, localFileLocation, localUploadEndpoint } = options
 
-    res.locals.uploadData = { upload: localUploadEndpoint }
+    if (!localUploadEndpoint) {
+      return next(new Error('No local upload endpoint set'))
+    }
 
-    createLocalUploadMiddleware(options)(req, res, next)
+    res.locals.fileName = genRandKeys ? genRandomFileName(name) : name
+    res.locals.uploadData = {
+      upload: localUploadEndpoint
+    }
+
+    if (localFileLocation) {
+      res.locals.uploadData.file = `${localFileLocation}/${res.locals.fileName}`
+    }
+
+    next()
   }
 }
 

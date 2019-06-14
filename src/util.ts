@@ -9,9 +9,9 @@ export const buildPath = (...args): string => {
 }
 
 /**
- *
- * @param name
- * @param type
+ * Generate random file name.
+ * @param name Name of file
+ * @param type Type of file
  */
 export const genRandomFileName = (name?: string, type?: string): string => {
   let fileName = uuidv4()
