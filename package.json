@@ -21,14 +21,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/IsaacLean/s3-mod.git"
+    "url": "git+https://github.com/IsaacLean/express-ffuh.git"
   },
   "author": "Matthew Lean",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/IsaacLean/s3-mod/issues"
+    "url": "https://github.com/IsaacLean/express-ffuh/issues"
   },
-  "homepage": "https://github.com/IsaacLean/s3-mod#readme",
+  "homepage": "https://github.com/IsaacLean/express-ffuh#readme",
   "peerDependencies": {
     "aws-sdk": "^2.453.0",
     "formidable": "^1.2.1",
