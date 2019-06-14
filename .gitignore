@@ -1,5 +1,6 @@
 coverage/
 dist/
+uploads/
 node_modules/
 .eslintcache
 yarn-error.log

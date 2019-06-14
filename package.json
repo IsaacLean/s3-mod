@@ -1,7 +1,7 @@
 {
-  "name": "s3-mod",
+  "name": "express-ffuh",
   "version": "0.0.1",
-  "description": "File upload library for AWS S3 with local file system upload fallback",
+  "description": "Express middleware that handles AWS S3 & local file system uploads",
   "main": "dist/back/index.js",
   "types": "dist/back/index.d.ts",
   "files": [
@@ -9,9 +9,11 @@
   ],
   "scripts": {
     "build": "tsc",
+    "build:watch": "nodemon --watch src --exec \"npm run build\"",
     "format": "prettier --write --parser=typescript --print-width=120 --semi=false --single-quote \"{src,test}/**/*.{js,ts}\"",
     "lint": "eslint --cache \"{src,test}/**/*.{js,ts}\"",
-    "start": "nodemon test/server",
+    "start": "node test/server",
+    "start:watch": "nodemon test/server",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "test:update": "jest -u",
@@ -28,9 +30,13 @@
   },
   "homepage": "https://github.com/IsaacLean/s3-mod#readme",
   "peerDependencies": {
-    "aws-sdk": "^2.453.0"
+    "aws-sdk": "^2.453.0",
+    "formidable": "^1.2.1",
+    "uuid": "^3.3.2"
   },
   "devDependencies": {
+    "@types/express": "^4.16.1",
+    "@types/formidable": "^1.0.31",
     "@types/jest": "^24.0.11",
     "@types/node": "^11.13.0",
     "@typescript-eslint/eslint-plugin": "^1.6.0",
@@ -44,11 +50,13 @@
     "eslint-plugin-jest": "^22.4.1",
     "eslint-plugin-prettier": "^3.0.1",
     "express": "^4.16.4",
+    "formidable": "^1.2.1",
     "jest": "24.7.1",
     "morgan": "^1.9.1",
     "nodemon": "^1.19.0",
     "prettier": "^1.16.4",
     "ts-jest": "^24.0.1",
-    "typescript": "^3.4.1"
+    "typescript": "^3.4.1",
+    "uuid": "^3.3.2"
   }
 }

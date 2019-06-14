@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 
 import fetch from 'cross-fetch'
 
-const Form = () => {
+const LocalUpload = () => {
   const [file, setFile] = useState(null)
 
   const changeFile = e => {
@@ -12,23 +12,28 @@ const Form = () => {
   const submit = e => {
     e.preventDefault()
 
-    return fetch(`/api/sign-s3?name=${file.name}&type=${file.type}`, { method: 'GET' })
+    const formData = new FormData()
+    formData.append('file', file)
+
+    fetch(`/api/upload-local`, {
+      method: 'PUT',
+      body: formData
+    })
       .then(res => {
         if (!res.ok) throw new Error('Get signed S3 request failed')
-
-        return res.json()
+        return res.text()
       })
-      .then(data => fetch(data.signedRequest, { method: 'PUT', body: file }).then(res => console.log(res)))
       .catch(err => console.error(err))
   }
 
   return (
     <form onSubmit={submit}>
+      <h1>Local Upload</h1>
       <p id="status">Please select a file...</p>
-      <input type="file" onChange={changeFile} />
+      <input type="file" name="foobar" onChange={changeFile} />
       <button type="submit">Submit</button>
     </form>
   )
 }
 
-export default Form
+export default LocalUpload

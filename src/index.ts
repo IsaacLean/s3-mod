@@ -1,93 +1,160 @@
-import AWS from 'aws-sdk'
+import formidable from 'formidable'
+import fs from 'fs'
+import path from 'path'
+import { Application } from 'express' // eslint-disable-line import/no-extraneous-dependencies
+import { S3 } from 'aws-sdk'
 
-import { UploadData } from './types'
+import { createBucket, genBucketURL, getBucketSignedURL } from './s3'
+import { genRandomFileName } from './util'
 
-/**
- * Generate AWS S3 bucket URL.
- * @param bucket AWS S3 bucket name
- * @param name File name
- * @param path (Optional) Path to bucket upload location. Should end with '/'.
- */
-export const genS3BucketURL = (bucket: string, name: string, path?: string): string => {
-  let url = `https://${bucket}.s3.amazonaws.com/`
-
-  if (path) url += path
-  url += name
-
-  return url
+interface FFUHOptions {
+  expiration?: number // S3 signed request expiration
+  genRandKeys?: boolean // Flag to generate random keys
+  localFileLocation?: string // Locally uploaded file server route location
+  localUploadEndpoint?: string // Server endpoint for local file uploading
+  localPath?: string // Local file system path
+  s3Path?: string // S3 bucket path
 }
 
 /**
- * Get signed URL from Amazon Web Services Simple Storage Service (S3).
- * Credentials are determined by the AWS shared credentials file. For more info:
- * https://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/loading-node-credentials-shared.html
- * @param s3 AWS S3 service object
- * @param bucket Generate AWS S3 bucket URL.
- * @param name File name
- * @param type File type
- * @param expiration Time in seconds on when to expire signed URL. Defaults to 60.
- * @param path (Optional) Path to bucket upload location. Should end with '/'.
+ * Create local upload middleware.
+ * Moves uploaded file to a locally stored location.
+ * @param options FFUH options
  */
-export const getS3SignedURL = (
-  s3: AWS.S3,
-  bucket: string,
-  name: string,
-  type: string,
-  expiration: number = 60,
-  path?: string
-): Promise<string> => {
-  let key = ''
+const createLocalUploadMiddleware = (options: FFUHOptions = {}): ((req, res, next) => void) => (
+  req,
+  res,
+  next
+): void => {
+  const form = new formidable.IncomingForm()
 
-  if (path) key += path
-  key += name
+  form.on(
+    'fileBegin',
+    (name, file): void => {
+      const f = file
+      const { genRandKeys, localPath } = options
+      const p = localPath || __dirname
 
-  return new Promise(
-    (resolve, reject): void => {
-      s3.getSignedUrl(
-        'putObject',
-        {
-          Bucket: bucket,
-          Key: key,
-          Expires: expiration,
-          ContentType: type,
-          ACL: 'public-read'
-        },
-        (err, data): void => {
-          if (err) {
-            reject(err)
-          } else {
-            resolve(data)
-          }
+      if (!fs.existsSync(p)) {
+        return next(new Error('Local path does not exist'))
+      }
+
+      res.locals.fileName = genRandKeys ? genRandomFileName(f.name) : f.name
+      f.path = path.join(p, res.locals.fileName)
+    }
+  )
+
+  form.parse(
+    req,
+    (err, fields, files): void => {
+      if (err) return next(err)
+
+      if (Object.keys(files).length === 0) {
+        return next(new Error('No files were uploaded'))
+      }
+
+      res.locals.files = files
+
+      if (res.locals.uploadData) {
+        const { localFileLocation } = options
+
+        if (!localFileLocation) {
+          return next(new Error('No local file location set'))
         }
-      )
+
+        res.locals.uploadData.file = `${localFileLocation}/${res.locals.fileName}`
+      }
+
+      return next()
     }
   )
 }
 
 /**
- * Get upload data from Amazon Web Services Simple Storage Service (S3) bucket.
- * Credentials are determined by the AWS shared credentials file. For more info:
- * https://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/loading-node-credentials-shared.html
- * @param s3 AWS S3 service object
- * @param bucket AWS S3 bucket name
- * @param name File name
- * @param type File type
- * @param expiration Time in seconds on when to expire signed URL. Defaults to 60.
- * @param path (Optional) Path to bucket upload location. Should end with '/'.
+ * Setup S3 middleware.
+ * Required if you will be using the S3 signed request middleware.
+ * @param app Express application. The S3 service object will be assigned to its local variables.
+ * @param s3Options (Optional) S3 service object options
  */
-export const getS3UploadData = (
-  s3: AWS.S3,
-  bucket: string,
-  name: string,
-  type: string,
-  expiration: number = 60,
-  path?: string
-): Promise<UploadData> =>
-  getS3SignedURL(s3, bucket, name, type, expiration, path)
-    .then(
-      (data): UploadData => ({
-        signedRequest: data,
-        url: genS3BucketURL(bucket, name, path)
-      })
-    )
-    .catch((err): Promise<never> => Promise.reject(err))
+const setupS3Middleware = (app: Application, s3Options?: S3.ClientConfiguration): ((req, res, next) => void) => (
+  req,
+  res,
+  next
+): void => {
+  if (process.env.S3_BUCKET) {
+    createBucket(s3Options, app)
+  }
+
+  next()
+}
+
+/**
+ * Create S3 signed request middleware.
+ * Creates middleware to handle creation of S3 signed request.
+ * Sets upload data as uploadData in response locals.
+ * @param app Express application.
+ * @param options FFUH options
+ */
+const createS3SignedRequestMiddleware = (app: Application, options: FFUHOptions): ((req, res, next) => void) => (
+  req,
+  res,
+  next
+): void => {
+  const { S3_BUCKET } = process.env
+
+  if (S3_BUCKET) {
+    const { name, type } = req.query
+    const { expiration, genRandKeys, s3Path } = options
+
+    const n = genRandKeys ? genRandomFileName(name) : name
+    const params = expiration ? { Expires: expiration } : undefined
+
+    getBucketSignedURL(app.locals.bucket, S3_BUCKET, n, type, s3Path, params)
+      .then(
+        (signedRequest): void => {
+          res.locals.uploadData = {
+            upload: signedRequest,
+            file: genBucketURL(S3_BUCKET, n, s3Path)
+          }
+
+          next()
+        }
+      )
+      .catch((err): Promise<any> => next(err)) // eslint-disable-line @typescript-eslint/no-explicit-any
+  } else {
+    throw new Error('S3_BUCKET is not set')
+  }
+}
+
+/**
+ * Create flexible file upload handler (FFUH) middleware.
+ * Creates S3 signed request middleware or local upload middleware depending on conditions.
+ * @param app Express application.
+ * @param check Function called to determine which middleware to create.
+ *   Return true to create S3 signed request middleware, false to create local upload middleware.
+ *   By default it will return true if NODE_ENV is set to "production".
+ * @param options FFUH options
+ */
+export default (
+  app: Application,
+  options?: FFUHOptions,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  check: (...args: any[]) => any = (): boolean => {
+    if (process.env.NODE_ENV === 'production') {
+      return true
+    }
+    return false
+  }
+): ((req, res, next) => void) => (req, res, next): void => {
+  if (check()) {
+    createS3SignedRequestMiddleware(app, options)(req, res, next)
+  } else {
+    const { localUploadEndpoint } = options
+
+    res.locals.uploadData = { upload: localUploadEndpoint }
+
+    createLocalUploadMiddleware(options)(req, res, next)
+  }
+}
+
+export { createLocalUploadMiddleware, setupS3Middleware, createS3SignedRequestMiddleware }
