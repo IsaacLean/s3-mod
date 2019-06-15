@@ -120,9 +120,9 @@ const createS3SignedRequestMiddleware = (app: Application, options: FFUHOptions)
         }
       )
       .catch((err): Promise<any> => next(err)) // eslint-disable-line @typescript-eslint/no-explicit-any
+  } else {
+    next(new Error('S3_BUCKET is not set'))
   }
-
-  return next(new Error('S3_BUCKET is not set'))
 }
 
 /**

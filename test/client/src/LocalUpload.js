@@ -20,7 +20,7 @@ const LocalUpload = () => {
       body: formData
     })
       .then(res => {
-        if (!res.ok) throw new Error('Get signed S3 request failed')
+        if (!res.ok) throw new Error('Upload failed')
         return res.text()
       })
       .catch(err => console.error(err))
