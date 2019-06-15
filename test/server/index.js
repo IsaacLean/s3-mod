@@ -26,7 +26,7 @@ app.get(rootPath, (req, res) => res.send('Hello World!'))
 app.put(
   `${rootPath}/upload-local`,
   createLocalUploadMiddleware({
-    genRandKeys: true,
+    genRandFileNames: true,
     localPath: `${process.cwd()}/uploads`
   }),
   (req, res) => {
@@ -36,7 +36,7 @@ app.put(
 )
 
 // S3 Signed Request Middleware
-app.get(`${rootPath}/sign-s3`, createS3SignedRequestMiddleware(app, { genRandKeys: true }), (req, res) => {
+app.get(`${rootPath}/sign-s3`, createS3SignedRequestMiddleware(app, { genRandFileNames: true }), (req, res) => {
   res.write(JSON.stringify(res.locals.uploadData))
   res.end()
 })
@@ -45,7 +45,7 @@ app.get(`${rootPath}/sign-s3`, createS3SignedRequestMiddleware(app, { genRandKey
 app.get(
   `${rootPath}/upload-ffuh`,
   ffuh(app, {
-    genRandKeys: true,
+    genRandFileNames: true,
     localFileLocation,
     localUploadEndpoint: 'http://localhost:3000/api/upload-local',
     localPath: `${process.cwd()}/uploads`

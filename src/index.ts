@@ -9,10 +9,10 @@ import { genRandomFileName } from './util'
 
 interface FFUHOptions {
   expiration?: number // S3 signed request expiration
-  genRandKeys?: boolean // Flag to generate random keys
+  genRandFileNames?: boolean // Flag to generate random file names
   localFileLocation?: string // Locally uploaded file server route location
   localUploadEndpoint?: string // Server endpoint for local file uploading
-  localPath?: string // Local file system path
+  localPath?: string //  Local file system path to store uploaded files to
   s3Path?: string // S3 bucket path
 }
 
@@ -32,7 +32,7 @@ const createLocalUploadMiddleware = (options: FFUHOptions = {}): ((req, res, nex
     'fileBegin',
     (name, file): void => {
       const f = file
-      const { genRandKeys, localPath } = options
+      const { genRandFileNames, localPath } = options
       const p = localPath || __dirname
 
       if (!fs.existsSync(p)) {
@@ -40,7 +40,7 @@ const createLocalUploadMiddleware = (options: FFUHOptions = {}): ((req, res, nex
       }
 
       if (!res.locals.fileName) {
-        res.locals.fileName = genRandKeys ? genRandomFileName(f.name) : f.name
+        res.locals.fileName = genRandFileNames ? genRandomFileName(f.name) : f.name
       }
 
       f.path = path.join(p, res.locals.fileName)
@@ -103,9 +103,9 @@ const createS3SignedRequestMiddleware = (app: Application, options: FFUHOptions)
     }
 
     const { name, type } = req.query
-    const { expiration, genRandKeys, s3Path } = options
+    const { expiration, genRandFileNames, s3Path } = options
 
-    const n = genRandKeys ? genRandomFileName(name) : name
+    const n = genRandFileNames ? genRandomFileName(name) : name
     const params = expiration ? { Expires: expiration } : undefined
 
     getBucketSignedURL(app.locals.bucket, S3_BUCKET, n, type, s3Path, params)
@@ -149,13 +149,13 @@ export default (
     createS3SignedRequestMiddleware(app, options)(req, res, next)
   } else {
     const { name } = req.query
-    const { genRandKeys, localFileLocation, localUploadEndpoint } = options
+    const { genRandFileNames, localFileLocation, localUploadEndpoint } = options
 
     if (!localUploadEndpoint) {
       return next(new Error('No local upload endpoint set'))
     }
 
-    res.locals.fileName = genRandKeys ? genRandomFileName(name) : name
+    res.locals.fileName = genRandFileNames ? genRandomFileName(name) : name
     res.locals.uploadData = {
       upload: localUploadEndpoint
     }
