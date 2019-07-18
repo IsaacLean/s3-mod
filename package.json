@@ -2,8 +2,8 @@
   "name": "express-ffuh",
   "version": "0.0.1",
   "description": "Express middleware that handles AWS S3 & local file system uploads",
-  "main": "dist/back/index.js",
-  "types": "dist/back/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
     "dist/**/*"
   ],
